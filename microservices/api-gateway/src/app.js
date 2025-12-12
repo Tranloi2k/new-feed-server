@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import bodyParser from "body-parser";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { authenticateToken } from "./middleware/auth.js";
 import { rateLimiter } from "./middleware/rateLimiter.js";
@@ -15,7 +16,6 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
 app.use(cookieParser());
 
 // Service URLs
@@ -35,14 +35,25 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Auth routes (public)
+// Auth routes (public) - parse body and restream
 app.use(
   "/api/auth",
   rateLimiter,
+  bodyParser.json(),
   createProxyMiddleware({
     target: SERVICES.auth,
     changeOrigin: true,
     pathRewrite: { "^/api/auth": "/api" },
+    onProxyReq: (proxyReq, req) => {
+      // Restream parsed body
+      if (req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader("Content-Type", "application/json");
+        proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        proxyReq.end();
+      }
+    },
   })
 );
 
@@ -50,6 +61,7 @@ app.use(
 app.use(
   "/api/posts",
   authenticateToken,
+  bodyParser.json(),
   createProxyMiddleware({
     target: SERVICES.post,
     changeOrigin: true,
@@ -60,6 +72,14 @@ app.use(
         proxyReq.setHeader("X-User-Id", req.user.userId);
         proxyReq.setHeader("X-User-Email", req.user.email);
       }
+      // Restream body
+      if (req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader("Content-Type", "application/json");
+        proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        proxyReq.end();
+      }
     },
   })
 );
@@ -68,6 +88,7 @@ app.use(
 app.use(
   "/api/comments",
   authenticateToken,
+  bodyParser.json(),
   createProxyMiddleware({
     target: SERVICES.comment,
     changeOrigin: true,
@@ -75,6 +96,14 @@ app.use(
     onProxyReq: (proxyReq, req) => {
       if (req.user) {
         proxyReq.setHeader("X-User-Id", req.user.userId);
+      }
+      // Restream body
+      if (req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader("Content-Type", "application/json");
+        proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        proxyReq.end();
       }
     },
   })
@@ -99,7 +128,7 @@ app.use("/api/sse", authenticateToken, (req, res, next) => {
   })(req, res, next);
 });
 
-// Media routes (protected)
+// Media routes (protected) - don't parse body (multipart/form-data)
 app.use(
   "/api/media",
   authenticateToken,
@@ -119,6 +148,7 @@ app.use(
 app.use(
   "/graphql",
   authenticateToken,
+  bodyParser.json(),
   createProxyMiddleware({
     target: SERVICES.post, // GraphQL ở Post Service
     changeOrigin: true,
@@ -126,6 +156,14 @@ app.use(
       if (req.user) {
         proxyReq.setHeader("X-User-Id", req.user.userId);
         proxyReq.setHeader("X-User-Email", req.user.email);
+      }
+      // Restream body for GraphQL
+      if (req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader("Content-Type", "application/json");
+        proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        proxyReq.end();
       }
     },
   })
