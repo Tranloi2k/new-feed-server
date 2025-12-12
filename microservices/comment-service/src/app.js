@@ -1,7 +1,9 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { ApolloServer } from "apollo-server-express";
+import { ApolloServer } from "@apollo/server";
+import { expressMiddleware } from "@apollo/server/express4";
+import bodyParser from "body-parser";
 import typeDefs from "./graphql/schema.js";
 import resolvers from "./graphql/resolvers.js";
 import sseRoutes from "./routes/sseRoutes.js";
@@ -28,30 +30,32 @@ app.use("/api/comments", commentRoutes);
 const apolloServer = new ApolloServer({
   typeDefs,
   resolvers,
-  context: ({ req }) => {
-    // User info from API Gateway headers
-    const userId = req.headers["x-user-id"];
-    const userEmail = req.headers["x-user-email"];
-
-    return {
-      user: userId
-        ? {
-            userId: parseInt(userId),
-            email: userEmail,
-          }
-        : null,
-    };
-  },
 });
 
 async function startServer() {
   await apolloServer.start();
 
-  apolloServer.applyMiddleware({
-    app,
-    path: "/graphql",
-    cors: false,
-  });
+  // Apollo v4 uses expressMiddleware instead of applyMiddleware
+  app.use(
+    "/graphql",
+    bodyParser.json(),
+    expressMiddleware(apolloServer, {
+      context: async ({ req }) => {
+        // User info from API Gateway headers
+        const userId = req.headers["x-user-id"];
+        const userEmail = req.headers["x-user-email"];
+
+        return {
+          user: userId
+            ? {
+                userId: parseInt(userId),
+                email: userEmail,
+              }
+            : null,
+        };
+      },
+    })
+  );
 
   // Initialize Redis subscriber for SSE
   await initRedisSubscriber();
