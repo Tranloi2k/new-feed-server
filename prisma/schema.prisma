@@ -1,0 +1,176 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 Int            @id @default(autoincrement())
+  username           String         @unique @db.VarChar(50)
+  email              String         @unique @db.VarChar(100)
+  passwordHash       String         @map("password_hash") @db.VarChar(255)
+  fullName           String?        @map("full_name") @db.VarChar(100)
+  avatarUrl          String?        @map("avatar_url") @db.VarChar(500)
+  bio                String?
+  isPrivate          Boolean?       @default(false) @map("is_private")
+  createdAt          DateTime?      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt          DateTime?      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  bookmarks          Bookmark[]
+  comments           Comment[]
+  followers          Follow[]       @relation("Follower")
+  following          Follow[]       @relation("Following")
+  likes              Like[]
+  actorNotifications Notification[] @relation("NotificationActor")
+  notifications      Notification[] @relation("NotificationUser")
+  posts              Post[]
+  shares             Share[]
+
+  @@map("users")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model Post {
+  id             Int            @id @default(autoincrement())
+  userId         Int?           @map("user_id")
+  content        String?
+  postType       String?        @default("text") @map("post_type") @db.VarChar(20)
+  mediaUrls      Json?          @map("media_urls")
+  location       String?        @db.VarChar(200)
+  isHidden       Boolean?       @default(false) @map("is_hidden")
+  likeCount      Int?           @default(0) @map("like_count")
+  commentCount   Int?           @default(0) @map("comment_count")
+  shareCount     Int?           @default(0) @map("share_count")
+  createdAt      DateTime?      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime?      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  bookmarks      Bookmark[]
+  comments       Comment[]
+  likes          Like[]
+  notifications  Notification[]
+  postHashtags   PostHashtag[]
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sharedPosts    Share[]        @relation("SharedPost")
+  originalShares Share[]        @relation("OriginalPost")
+
+  @@index([createdAt(sort: Desc)], map: "idx_posts_created")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_posts_user_created")
+  @@map("posts")
+}
+
+model Comment {
+  id              Int            @id @default(autoincrement())
+  postId          Int?           @map("post_id")
+  userId          Int?           @map("user_id")
+  parentCommentId Int?           @map("parent_comment_id")
+  content         String
+  likeCount       Int?           @default(0) @map("like_count")
+  createdAt       DateTime?      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime?      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  parentComment   Comment?       @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  replies         Comment[]      @relation("CommentReplies")
+  post            Post?          @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user            User?          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  likes           Like[]
+  notifications   Notification[]
+
+  @@map("comments")
+}
+
+model Like {
+  id           Int       @id @default(autoincrement())
+  userId       Int?      @map("user_id")
+  postId       Int?      @map("post_id")
+  commentId    Int?      @map("comment_id")
+  reactionType String?   @default("like") @map("reaction_type") @db.VarChar(20)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  comment      Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  post         Post?     @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("likes")
+}
+
+model Follow {
+  id          Int       @id @default(autoincrement())
+  followerId  Int?      @map("follower_id")
+  followingId Int?      @map("following_id")
+  status      String?   @default("pending") @db.VarChar(20)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  follower    User?     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  following   User?     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([followerId, followingId])
+  @@index([followerId, status], map: "idx_follows_follower")
+  @@index([followingId, status], map: "idx_follows_following")
+  @@map("follows")
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int?      @map("user_id")
+  actorId   Int?      @map("actor_id")
+  type      String    @db.VarChar(50)
+  postId    Int?      @map("post_id")
+  commentId Int?      @map("comment_id")
+  isRead    Boolean?  @default(false) @map("is_read")
+  metadata  Json?
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  actor     User?     @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  comment   Comment?  @relation(fields: [commentId], references: [id], onUpdate: NoAction)
+  post      Post?     @relation(fields: [postId], references: [id], onUpdate: NoAction)
+  user      User?     @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId, isRead, createdAt(sort: Desc)], map: "idx_notifications_user_unread")
+  @@map("notifications")
+}
+
+model Hashtag {
+  id           Int           @id @default(autoincrement())
+  name         String        @unique @db.VarChar(100)
+  postCount    Int?          @default(0) @map("post_count")
+  createdAt    DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
+  postHashtags PostHashtag[]
+
+  @@index([name], map: "idx_hashtags_name")
+  @@map("hashtags")
+}
+
+model Bookmark {
+  id        Int       @id @default(autoincrement())
+  userId    Int?      @map("user_id")
+  postId    Int?      @map("post_id")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  post      Post?     @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, postId])
+  @@map("bookmarks")
+}
+
+model Share {
+  id             Int       @id @default(autoincrement())
+  userId         Int?      @map("user_id")
+  originalPostId Int?      @map("original_post_id")
+  newPostId      Int?      @map("new_post_id")
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  newPost        Post?     @relation("SharedPost", fields: [newPostId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  originalPost   Post?     @relation("OriginalPost", fields: [originalPostId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("shares")
+}
+
+model PostHashtag {
+  postId    Int       @map("post_id")
+  hashtagId Int       @map("hashtag_id")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  hashtag   Hashtag   @relation(fields: [hashtagId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([postId, hashtagId])
+  @@index([hashtagId], map: "idx_post_hashtags_hashtag")
+  @@map("post_hashtags")
+}
