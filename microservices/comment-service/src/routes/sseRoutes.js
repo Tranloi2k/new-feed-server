@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { addConnection } from "../services/sseService.js";
 
@@ -10,7 +11,7 @@ router.get("/comments/:postId", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-  res.setHeader("Access-Control-Allow-Origin", process.env.CLIENT_URL);
+  res.setHeader("Access-Control-Allow-Origin", process.env.CLIENT_URL || "http://localhost:3000");
 
   // Send initial connection message
   res.write(

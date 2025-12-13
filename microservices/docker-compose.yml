@@ -15,6 +15,7 @@ services:
       - COMMENT_SERVICE_URL=http://comment-service:3004
       - JWT_SECRET=${JWT_SECRET}
       - SERVICE_SECRET=${SERVICE_SECRET}
+      - CLIENT_URL=http://localhost:3000
     depends_on:
       - auth-service
       - post-service
@@ -34,6 +35,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres-auth:5432/auth_db
       - JWT_SECRET=${JWT_SECRET}
       - SERVICE_SECRET=${SERVICE_SECRET}
+      - CLIENT_URL=http://localhost:3000
     depends_on:
       - postgres-auth
     networks:
@@ -51,6 +53,7 @@ services:
       - RABBITMQ_URL=amqp://admin:admin@rabbitmq:5672
       - AUTH_SERVICE_URL=http://auth-service:3001
       - SERVICE_SECRET=${SERVICE_SECRET}
+      - CLIENT_URL=http://localhost:3000
     depends_on:
       - postgres-post
       - rabbitmq
@@ -69,6 +72,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://admin:admin@rabbitmq:5672
       - SERVICE_SECRET=${SERVICE_SECRET}
+      - CLIENT_URL=http://localhost:3000
     depends_on:
       - postgres-comment
       - redis
@@ -88,6 +92,7 @@ services:
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
       - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
       - SERVICE_SECRET=${SERVICE_SECRET}
+      - CLIENT_URL=http://localhost:3000
     networks:
       - microservices-network
 
