@@ -1,139 +1,111 @@
 import cloudinary from "../config/cloudinary.js";
-import prisma from "../lib/prisma.js";
 import { Readable } from "stream";
 
-export async function uploadImage(file, userId) {
-  try {
-    // Convert buffer to stream
-    const stream = Readable.from(file.buffer);
-
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: "newfeed/images",
-          resource_type: "image",
-          transformation: [
-            { width: 1200, height: 1200, crop: "limit" },
-            { quality: "auto" },
-          ],
-        },
-        async (error, result) => {
-          if (error) {
-            reject(error);
-          } else {
-            try {
-              // Save metadata to database
-              const media = await prisma.media.create({
-                data: {
-                  userId,
-                  url: result.secure_url,
-                  publicId: result.public_id,
-                  type: "image",
-                  size: result.bytes,
-                  width: result.width,
-                  height: result.height,
-                },
-              });
-
-              resolve({
-                id: media.id,
-                url: result.secure_url,
-                publicId: result.public_id,
-                width: result.width,
-                height: result.height,
-              });
-            } catch (dbError) {
-              reject(dbError);
-            }
-          }
+/**
+ * Upload file lên Cloudinary từ buffer
+ * @param {Buffer} fileBuffer - File buffer từ multer
+ * @param {Object} options - Cloudinary upload options
+ * @returns {Promise<Object>} - Cloudinary upload result
+ */
+const uploadToCloudinary = (fileBuffer, options = {}) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: options.folder || "newfeed",
+        resource_type: options.resourceType || "auto",
+        transformation: options.transformation || [],
+        ...options,
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(result);
         }
-      );
+      }
+    );
 
-      stream.pipe(uploadStream);
-    });
-  } catch (error) {
-    console.error("Upload image error:", error);
-    throw error;
-  }
-}
+    // Convert buffer to stream và pipe vào Cloudinary
+    const readableStream = new Readable();
+    readableStream.push(fileBuffer);
+    readableStream.push(null);
+    readableStream.pipe(uploadStream);
+  });
+};
 
-export async function uploadVideo(file, userId) {
+/**
+ * Upload nhiều files lên Cloudinary
+ * @param {Array} files - Array of file objects from multer
+ * @param {Object} options - Upload options
+ * @returns {Promise<Array>} - Array of Cloudinary URLs
+ */
+const uploadMultipleFiles = async (files, options = {}) => {
   try {
-    const stream = Readable.from(file.buffer);
+    const uploadPromises = files.map((file) => {
+      // Xác định resource type dựa trên mimetype
+      const resourceType = file.mimetype.startsWith("video/")
+        ? "video"
+        : "image";
 
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: "newfeed/videos",
-          resource_type: "video",
-          transformation: [{ quality: "auto" }],
-        },
-        async (error, result) => {
-          if (error) {
-            reject(error);
-          } else {
-            try {
-              const media = await prisma.media.create({
-                data: {
-                  userId,
-                  url: result.secure_url,
-                  publicId: result.public_id,
-                  type: "video",
-                  size: result.bytes,
-                  width: result.width,
-                  height: result.height,
-                },
-              });
-
-              resolve({
-                id: media.id,
-                url: result.secure_url,
-                publicId: result.public_id,
-                width: result.width,
-                height: result.height,
-              });
-            } catch (dbError) {
-              reject(dbError);
-            }
-          }
-        }
-      );
-
-      stream.pipe(uploadStream);
+      return uploadToCloudinary(file.buffer, {
+        ...options,
+        resourceType,
+        folder: options.folder || "newfeed/posts",
+      });
     });
-  } catch (error) {
-    console.error("Upload video error:", error);
-    throw error;
-  }
-}
 
-export async function deleteMedia(mediaId, userId) {
+    const results = await Promise.all(uploadPromises);
+    return results.map((result) => ({
+      url: result.secure_url,
+      publicId: result.public_id,
+      resourceType: result.resource_type,
+      format: result.format,
+      width: result.width,
+      height: result.height,
+      duration: result.duration, // Chỉ có với video
+    }));
+  } catch (error) {
+    throw new Error(`Failed to upload files: ${error.message}`);
+  }
+};
+
+/**
+ * Xóa file khỏi Cloudinary
+ * @param {String} publicId - Public ID của file trên Cloudinary
+ * @param {String} resourceType - 'image' hoặc 'video'
+ * @returns {Promise<Object>}
+ */
+const deleteFromCloudinary = async (publicId, resourceType = "image") => {
   try {
-    const media = await prisma.media.findUnique({
-      where: { id: mediaId },
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
     });
-
-    if (!media) {
-      throw new Error("Media not found");
-    }
-
-    if (media.userId !== userId) {
-      throw new Error("Unauthorized to delete this media");
-    }
-
-    // Delete from Cloudinary
-    await cloudinary.uploader.destroy(media.publicId, {
-      resource_type: media.type === "video" ? "video" : "image",
-    });
-
-    // Delete from database
-    await prisma.media.delete({
-      where: { id: mediaId },
-    });
-
-    return { success: true };
+    return result;
   } catch (error) {
-    console.error("Delete media error:", error);
-    throw error;
+    throw new Error(`Failed to delete file: ${error.message}`);
   }
-}
+};
+
+/**
+ * Xóa nhiều files khỏi Cloudinary
+ * @param {Array} publicIds - Array of public IDs
+ * @param {String} resourceType - 'image' hoặc 'video'
+ * @returns {Promise<Object>}
+ */
+const deleteMultipleFiles = async (publicIds, resourceType = "image") => {
+  try {
+    const result = await cloudinary.api.delete_resources(publicIds, {
+      resource_type: resourceType,
+    });
+    return result;
+  } catch (error) {
+    throw new Error(`Failed to delete files: ${error.message}`);
+  }
+};
+
+export {
+  uploadToCloudinary,
+  uploadMultipleFiles,
+  deleteFromCloudinary,
+  deleteMultipleFiles,
+};
