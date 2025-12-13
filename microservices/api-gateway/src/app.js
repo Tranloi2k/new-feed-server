@@ -144,13 +144,33 @@ app.use(
   })
 );
 
-// GraphQL routes (protected)
-app.use(
-  "/graphql",
-  authenticateToken,
-  bodyParser.json(),
+// GraphQL routes (protected) - dynamic routing based on query
+app.use("/graphql", authenticateToken, bodyParser.json(), (req, res, next) => {
+  // Detect which service based on GraphQL operation
+  const query = req.body.query || "";
+  const operationName = req.body.operationName || "";
+
+  let targetService = SERVICES.post; // default to Post Service
+
+  // Route to Comment Service if query contains comment operations
+  if (
+    query.includes("getComments") ||
+    query.includes("createComment") ||
+    query.includes("deleteComment") ||
+    operationName.toLowerCase().includes("comment")
+  ) {
+    targetService = SERVICES.comment;
+    console.log(
+      `[GraphQL] Routing to Comment Service: ${operationName || "query"}`
+    );
+  } else {
+    console.log(
+      `[GraphQL] Routing to Post Service: ${operationName || "query"}`
+    );
+  }
+
   createProxyMiddleware({
-    target: SERVICES.post, // GraphQL ở Post Service
+    target: targetService,
     changeOrigin: true,
     onProxyReq: (proxyReq, req) => {
       if (req.user) {
@@ -166,8 +186,8 @@ app.use(
         proxyReq.end();
       }
     },
-  })
-);
+  })(req, res, next);
+});
 
 // Root
 app.get("/", (req, res) => {
