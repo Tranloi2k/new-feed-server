@@ -5,7 +5,6 @@ Backend server Node.js với authentication APIs (login/logout)
 ## 🚀 Cài đặt
 
 ```bash
-# Cài đặt dependencies
 npm install
 ```
 
