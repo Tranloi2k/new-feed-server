@@ -11,11 +11,11 @@ const login = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Vui lòng nhập đầy đủ username và password",
+        message: "Please enter complete username and password",
       });
     }
 
-    // Tìm user trong database
+    // Find user in database
     const user = await prisma.user.findFirst({
       where: {
         OR: [{ username: email }, { email: email }],
@@ -25,21 +25,21 @@ const login = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Username không đúng",
+        message: "Username is incorrect",
       });
     }
 
-    // Kiểm tra password
+    // Check password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: "Username hoặc password không đúng",
+        message: "Username or password is incorrect",
       });
     }
 
-    // Tạo JWT token
+    // Create JWT token
     const token = jwt.sign(
       {
         id: user.id,
@@ -61,7 +61,7 @@ const login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Đăng nhập thành công",
+      message: "Login successful",
       data: {
         accessToken: token,
         userId: user.id,
@@ -75,7 +75,7 @@ const login = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Lỗi server",
+      message: "Server error",
       error: error.message,
     });
   }
@@ -84,7 +84,7 @@ const login = async (req, res) => {
 // Logout
 const logout = (req, res) => {
   try {
-    // Xóa cookie
+    // Delete cookie
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -94,18 +94,18 @@ const logout = (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Đăng xuất thành công",
+      message: "Logout successful",
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Lỗi server",
+      message: "Server error",
       error: error.message,
     });
   }
 };
 
-// Get current user info (API bổ sung để test authentication)
+// Get current user info (Supplementary API for testing authentication)
 const getCurrentUser = async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -124,7 +124,7 @@ const getCurrentUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Không tìm thấy user",
+        message: "User not found",
       });
     }
 
@@ -135,7 +135,7 @@ const getCurrentUser = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Lỗi server",
+      message: "Server error",
       error: error.message,
     });
   }
@@ -150,7 +150,7 @@ const signup = async (req, res) => {
     if (!username || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Vui lòng nhập đầy đủ username, email và password",
+        message: "Please enter complete username, email and password",
       });
     }
 
@@ -159,7 +159,7 @@ const signup = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Email không hợp lệ",
+        message: "Invalid email",
       });
     }
 
@@ -167,11 +167,11 @@ const signup = async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password phải có ít nhất 6 ký tự",
+        message: "Password must be at least 6 characters long",
       });
     }
 
-    // Kiểm tra username hoặc email đã tồn tại
+    // Check if username or email already exists
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [{ username: username }, { email: email }],
@@ -182,13 +182,13 @@ const signup = async (req, res) => {
       if (existingUser.username === username) {
         return res.status(409).json({
           success: false,
-          message: "Username đã được sử dụng",
+          message: "Username is already in use",
         });
       }
       if (existingUser.email === email) {
         return res.status(409).json({
           success: false,
-          message: "Email đã được sử dụng",
+          message: "Email is already in use",
         });
       }
     }
@@ -196,7 +196,7 @@ const signup = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Tạo user mới trong database
+    // Create new user in database
     const newUser = await prisma.user.create({
       data: {
         username,
@@ -206,7 +206,7 @@ const signup = async (req, res) => {
       },
     });
 
-    // Tạo JWT token
+    // Create JWT token
     const token = jwt.sign(
       {
         id: newUser.id,
@@ -228,7 +228,7 @@ const signup = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Đăng ký thành công",
+      message: "Registration successful",
       data: {
         accessToken: token,
         userId: newUser.id,
@@ -243,7 +243,7 @@ const signup = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Lỗi server",
+      message: "Server error",
       error: error.message,
     });
   }
