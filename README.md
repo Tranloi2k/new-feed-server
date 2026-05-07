@@ -1,29 +1,29 @@
 # New Feed Server API
 
-Backend server Node.js với authentication APIs (login/logout)
+Node.js backend server with authentication APIs (login/logout)
 
-## 🚀 Cài đặt
+## 🚀 Installation
 
 ```bash
 npm install
 ```
 
-## ⚙️ Cấu hình
+## ⚙️ Configuration
 
-File `.env` đã được tạo với các cấu hình mặc định:
+The `.env` file has been created with default configurations:
 
 - PORT: 3000
-- JWT_SECRET: (nên thay đổi trong môi trường production)
+- JWT_SECRET: (should be changed in production environment)
 - JWT_EXPIRE: 7d
 - NODE_ENV: development
 
-## 🏃 Chạy server
+## 🏃 Running the Server
 
 ```bash
-# Chế độ development (với nodemon)
+# Development mode (with nodemon)
 npm run dev
 
-# Chế độ production
+# Production mode
 npm start
 ```
 
@@ -48,7 +48,7 @@ npm start
 ```json
 {
   "success": true,
-  "message": "Đăng nhập thành công",
+  "message": "Login successful",
   "data": {
     "token": "jwt_token_here",
     "user": {
@@ -69,7 +69,7 @@ npm start
 ```json
 {
   "success": true,
-  "message": "Đăng xuất thành công"
+  "message": "Logout successful"
 }
 ```
 
@@ -90,7 +90,7 @@ npm start
 }
 ```
 
-## 👥 Tài khoản mẫu
+## 👥 Sample Accounts
 
 1. **Admin**
 
@@ -101,35 +101,35 @@ npm start
    - Username: `user`
    - Password: `user123`
 
-## 🗂️ Cấu trúc project
+## 🗂️ Project Structure
 
 ```
 new-feed-server/
-├── app.js                  # File chính của server
-├── package.json            # Dependencies và scripts
-├── .env                    # Biến môi trường
+├── app.js                  # Main server file
+├── package.json            # Dependencies and scripts
+├── .env                    # Environment variables
 ├── .gitignore             # Git ignore
 ├── config/
-│   └── database.js        # Dữ liệu mẫu và session storage
+│   └── database.js        # Sample data and session storage
 ├── controllers/
-│   └── authController.js  # Logic xử lý authentication
+│   └── authController.js  # Authentication logic handler
 ├── middleware/
-│   └── auth.js           # Middleware xác thực JWT
+│   └── auth.js           # JWT authentication middleware
 └── routes/
-    └── authRoutes.js     # Định nghĩa routes cho auth
+    └── authRoutes.js     # Authentication routes definition
 ```
 
 ## 🔐 Authentication Flow
 
-1. User gửi username/password đến `/api/auth/login`
-2. Server xác thực và trả về JWT token
-3. Client lưu token và gửi kèm trong header cho các request tiếp theo
-4. Server xác thực token qua middleware `authenticateToken`
-5. User có thể logout qua `/api/auth/logout` để xóa session
+1. User sends username/password to `/api/auth/login`
+2. Server authenticates and returns JWT token
+3. Client saves token and sends it in the header for subsequent requests
+4. Server validates token through `authenticateToken` middleware
+5. User can logout via `/api/auth/logout` to remove session
 
-## 📝 Ghi chú
+## 📝 Notes
 
-- Hiện tại đang sử dụng dữ liệu mẫu trong memory (không có database)
-- Session được lưu trong Map (nên dùng Redis trong production)
-- Passwords đã được hash bằng bcryptjs
-- JWT token có thời gian sống 7 ngày
+- Currently using sample data in memory (no database)
+- Sessions are stored in Map (should use Redis in production)
+- Passwords are hashed using bcryptjs
+- JWT token has a lifespan of 7 days
